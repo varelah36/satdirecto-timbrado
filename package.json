@@ -1,0 +1,21 @@
+{
+  "name": "satdirecto-timbrado",
+  "version": "1.0.0",
+  "description": "Microservicio de timbrado CFDI 4.0 con Finkok - SAT Directo",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "fast-xml-parser": "^4.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
