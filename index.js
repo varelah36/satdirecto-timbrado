@@ -86,13 +86,23 @@ app.post('/timbrar', async (req, res) => {
       timeout: 30000
     });
 
-    console.log('Status:', response.status);
-    console.log('Respuesta:', response.data?.toString().substring(0, 500));
+    const responseXML = response.data.toString();
 
-    res.json({
-      success: true,
-      raw: response.data?.toString().substring(0, 1000)
-    });
+console.log('Status:', response.status);
+console.log('Respuesta:', responseXML.substring(0, 500));
+
+// 🔥 EXTRAER UUID REAL
+const uuidMatch = responseXML.match(/UUID="([^"]+)"/);
+const uuid = uuidMatch ? uuidMatch[1] : null;
+
+console.log('UUID EXTRAÍDO:', uuid);
+
+// 🔥 RESPUESTA CORRECTA AL FRONT
+res.json({
+  success: true,
+  uuid: uuid,
+  raw: responseXML.substring(0, 1000)
+});
 
   } catch (err) {
     console.error('ERROR:', err.message);
