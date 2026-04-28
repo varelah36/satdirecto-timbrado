@@ -188,7 +188,7 @@ app.post('/timbrar', async (req, res) => {
     // 3. Credenciales Finkok
     const username = finkokUser || process.env.FINKOK_USER || 'varelah36@gmail.com';
     const password = finkokPass || process.env.FINKOK_PASS || 'Eduvare1@';
-    const finkokUrl = process.env.FINKOK_URL || 'https://demo-facturacion.finkok.com/servicios/soap/stamp.wsdl';
+    const finkokUrl = process.env.FINKOK_URL || 'https://demo-facturacion.finkok.com/servicios/soap/stamp';
 
     // 4. Construir SOAP Envelope
     const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
