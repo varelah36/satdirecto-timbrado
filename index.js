@@ -194,14 +194,14 @@ app.post('/timbrar', async (req, res) => {
     const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope 
   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
-  xmlns:stamp="http://facturacion.finkok.com/stamp">
+  xmlns:ns1="http://facturacion.finkok.com/stamp">
   <soapenv:Header/>
   <soapenv:Body>
-    <stamp:stamp_cfdi>
-      <stamp:xml>${xmlBase64}</stamp:xml>
-      <stamp:username>${username}</stamp:username>
-      <stamp:password>${password}</stamp:password>
-    </stamp:stamp_cfdi>
+    <ns1:stamp>
+      <ns1:xml>${xmlBase64}</ns1:xml>
+      <ns1:username>${username}</ns1:username>
+      <ns1:password>${password}</ns1:password>
+    </ns1:stamp>
   </soapenv:Body>
 </soapenv:Envelope>`;
 
@@ -215,7 +215,7 @@ app.post('/timbrar', async (req, res) => {
       url: finkokUrl,
       headers: {
         'Content-Type': 'text/xml;charset=UTF-8',
-        'SOAPAction': '"http://facturacion.finkok.com/stamp/stamp_cfdi"',
+        'SOAPAction': '""',
         'Accept': 'text/xml'
       },
       data: soapEnvelope,
