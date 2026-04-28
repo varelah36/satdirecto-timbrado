@@ -224,63 +224,46 @@ app.post('/timbrar', async (req, res) => {
     });
 
     console.log('Status Finkok:', response.status);
-    console.log('Respuesta Finkok (primeros 500 chars):', 
-      response.data?.toString()?.substring(0, 500));
-
-    // 6. Parsear respuesta XML de Finkok
     const xmlRespuesta = response.data?.toString() || '';
-    
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-      removeNSPrefix: true
-    });
+    console.log('Respuesta Finkok (primeros 800 chars):', xmlRespuesta.substring(0, 800));
 
-    let resultado;
-    try {
-      resultado = parser.parse(xmlRespuesta);
-    } catch (parseErr) {
-      console.error('Error parseando respuesta Finkok:', parseErr);
-      return res.status(500).json({
-        success: false,
-        error: 'Error al parsear respuesta de Finkok',
-        rawResponse: xmlRespuesta.substring(0, 500)
-      });
+    // 6. Extraer UUID directo con regex - más confiable que XML parser
+    // Finkok puede devolver UUID en atributo o en elemento
+    const uuidPatterns = [
+      /UUID="([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"/i,
+      /<[^>]*UUID[^>]*>([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})</i,
+      /([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/i
+    ];
+
+    let uuid = null;
+    for (const pattern of uuidPatterns) {
+      const match = xmlRespuesta.match(pattern);
+      if (match && match[1]) {
+        uuid = match[1].toUpperCase();
+        break;
+      }
     }
 
-    // 7. Extraer resultado del SOAP
-    const body = resultado?.Envelope?.Body 
-      || resultado?.['soapenv:Envelope']?.['soapenv:Body']
-      || {};
-    
-    const stampResponse = body?.stamp_cfdiResponse 
-      || body?.stamp_cfdiResult
-      || body?.stampResponse
-      || {};
+    console.log('UUID extraído:', uuid);
 
-    const stampResult = stampResponse?.stamp_cfdiResult
-      || stampResponse?.return
-      || stampResponse
-      || {};
+    // 7. Extraer otros datos con regex
+    const codEstatusMatch = xmlRespuesta.match(/CodEstatus[^>]*>([^<]+)</i) 
+      || xmlRespuesta.match(/CodEstatus="([^"]+)"/i);
+    const codEstatus = codEstatusMatch ? codEstatusMatch[1] : null;
 
-    console.log('Stamp Result:', JSON.stringify(stampResult, null, 2));
+    const errorMatch = xmlRespuesta.match(/MensajeIncidencia[^>]*>([^<]+)</i)
+      || xmlRespuesta.match(/faultstring[^>]*>([^<]+)</i)
+      || xmlRespuesta.match(/message[^>]*>([^<]+)</i);
+    const errorMsg = errorMatch ? errorMatch[1] : null;
 
-    // 8. Verificar si fue exitoso
-    const uuid = stampResult?.UUID 
-      || stampResult?.uuid
-      || extractFromXML(xmlRespuesta, 'UUID')
-      || extractFromXML(xmlRespuesta, 'uuid');
+    const xmlTimbradoMatch = xmlRespuesta.match(/<xml[^>]*>([^<]+)<\/[^>]*xml>/i);
+    const xmlTimbrado = xmlTimbradoMatch ? xmlTimbradoMatch[1] : null;
 
-    const codEstatus = stampResult?.CodEstatus
-      || stampResult?.Incidencias?.Incidencia?.CodigoError
-      || extractFromXML(xmlRespuesta, 'CodEstatus');
+    console.log('CodEstatus:', codEstatus);
+    console.log('Error:', errorMsg);
 
-    const xmlTimbrado = stampResult?.xml
-      || stampResult?.XML
-      || extractFromXML(xmlRespuesta, 'xml');
-
-    if (uuid && uuid.length > 30) {
-      // ÉXITO
+    if (uuid) {
+      // ✅ TIMBRADO EXITOSO
       console.log('✅ TIMBRADO EXITOSO - UUID:', uuid);
       return res.json({
         success: true,
@@ -291,19 +274,16 @@ app.post('/timbrar', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      // ERROR de Finkok
-      const errorMsg = stampResult?.Incidencias?.Incidencia?.MensajeIncidencia
-        || stampResult?.MensajeIncidencia
-        || codEstatus
-        || extractFromXML(xmlRespuesta, 'MensajeIncidencia')
-        || 'Error desconocido de Finkok';
-
-      console.error('❌ Error Finkok:', errorMsg);
+      // ❌ ERROR - Finkok no devolvió UUID
+      const mensajeError = errorMsg || codEstatus || 'Sin UUID en respuesta de Finkok';
+      console.error('❌ Error Finkok:', mensajeError);
+      console.error('Respuesta completa:', xmlRespuesta.substring(0, 2000));
+      
       return res.status(422).json({
         success: false,
-        error: errorMsg,
+        error: mensajeError,
         codEstatus: codEstatus,
-        rawResponse: xmlRespuesta.substring(0, 1000)
+        rawResponse: xmlRespuesta.substring(0, 1500)
       });
     }
 
