@@ -4,11 +4,16 @@
 
 const express = require('express');
 const axios = require('axios');
+const Stripe = require('stripe');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 const users = [];
+
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
 
 // CORS
 app.use((req, res, next) => {
@@ -52,8 +57,6 @@ function generarXML(datos) {
 // TIMBRAR
 app.post('/timbrar', async (req, res) => {
   try {
-    console.log('=== TIMBRADO ===');
-
     const username = process.env.FINKOK_USER;
     const password = process.env.FINKOK_PASS;
     const url = process.env.FINKOK_URL || 'https://demo-facturacion.finkok.com/servicios/soap/stamp.wsdl';
@@ -87,15 +90,18 @@ app.post('/timbrar', async (req, res) => {
     const uuidMatch = responseXML.match(/UUID="([^"]+)"/);
     const uuid = uuidMatch ? uuidMatch[1] : null;
 
-    res.json({
+    return res.json({
       success: true,
       uuid,
       raw: responseXML.substring(0, 1000)
     });
 
   } catch (err) {
-    console.error('ERROR:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('ERROR TIMBRAR:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 });
 
@@ -112,6 +118,7 @@ app.post('/auth/register', async (req, res) => {
     }
 
     const exists = users.find(u => u.email === email);
+
     if (exists) {
       return res.status(400).json({
         success: false,
@@ -172,23 +179,7 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-// 404 JSON
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found'
-  });
-});
-
-// START
-const PORT = process.env.PORT || 3000;// ===============================
 // STRIPE CHECKOUT
-// ===============================
-const Stripe = require('stripe');
-const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY) 
-  : null;
-
 app.post('/stripe/create-checkout-session', async (req, res) => {
   try {
     if (!stripe) {
@@ -200,6 +191,7 @@ app.post('/stripe/create-checkout-session', async (req, res) => {
 
     const plan = (req.body.plan || '').toLowerCase();
     const billing = (req.body.billing || 'monthly').toLowerCase();
+    const email = req.body.email || '';
 
     const priceMap = {
       esencial: {
@@ -225,11 +217,11 @@ app.post('/stripe/create-checkout-session', async (req, res) => {
     if (!priceId) {
       return res.status(400).json({
         success: false,
-        error: 'Plan inválido o no configurado'
+        error: `Plan inválido o no configurado: ${plan} ${billing}`
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionConfig = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [
@@ -238,43 +230,71 @@ app.post('/stripe/create-checkout-session', async (req, res) => {
           quantity: 1
         }
       ],
-      success_url: 'https://satdirecto.com/success',
-      cancel_url: 'https://satdirecto.com/planes'
-    });
+      success_url: 'https://satdirecto.com/success?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'https://satdirecto.com/planes',
+      metadata: {
+        plan,
+        billing
+      }
+    };
 
-    res.json({
-      success: true,
-      url: session.url
-    });
+    if (email) {
+      sessionConfig.customer_email = email;
+    }
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-  }
-});
-app.post('/stripe/create-checkout-session', async (req, res) => {
-  try {
-    const { plan, billing } = req.body;
-
-    console.log('Stripe request:', { plan, billing });
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return res.json({
       success: true,
-      url: 'https://checkout.stripe.com/test',
-      sessionId: 'test_session'
+      url: session.url,
+      sessionId: session.id
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('ERROR STRIPE:', err.message);
     return res.status(500).json({
       success: false,
       error: err.message
     });
   }
 });
+
+// VERIFY STRIPE SESSION
+app.get('/stripe/verify-session/:sessionId', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: 'Stripe no configurado'
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+
+    return res.json({
+      success: true,
+      session
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+// 404 JSON — SIEMPRE AL FINAL
+app.use((req, res) => {
+  return res.status(404).json({
+    success: false,
+    error: 'Endpoint not found'
+  });
+});
+
+// START — SIEMPRE LO ÚLTIMO
+const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
 });
