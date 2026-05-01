@@ -24,6 +24,14 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'satdirecto-timbrado',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ============================================
 // GENERAR XML SIMPLE
 // ============================================
