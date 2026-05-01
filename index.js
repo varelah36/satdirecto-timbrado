@@ -119,6 +119,64 @@ res.json({
 });
 
 // ============================================
+// ============================================
+// AUTH — REGISTRO
+// ============================================
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name, rfc, razonSocial } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email y password requeridos'
+      });
+    }
+
+    console.log('Nuevo usuario:', req.body);
+
+    return res.json({
+      success: true,
+      user: {
+        email,
+        name,
+        rfc,
+        razonSocial,
+        plan: 'gratuito'
+      }
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error creando usuario'
+    });
+  }
+});
+
+// ============================================
+// AUTH — LOGIN
+// ============================================
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    return res.json({
+      success: true,
+      token: 'test-token',
+      user: {
+        email,
+        plan: 'gratuito'
+      }
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error login'
+    });
+  }
+});
 // START
 // ============================================
 const PORT = process.env.PORT || 3000;
