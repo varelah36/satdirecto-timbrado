@@ -255,6 +255,26 @@ app.post('/stripe/create-checkout-session', async (req, res) => {
     });
   }
 });
+app.post('/stripe/create-checkout-session', async (req, res) => {
+  try {
+    const { plan, billing } = req.body;
+
+    console.log('Stripe request:', { plan, billing });
+
+    return res.json({
+      success: true,
+      url: 'https://checkout.stripe.com/test',
+      sessionId: 'test_session'
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
 });
