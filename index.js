@@ -7,7 +7,9 @@ const axios = require('axios');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+
 const users = [];
+
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -17,9 +19,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ============================================
 // HEALTH
-// ============================================
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -32,9 +32,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ============================================
 // GENERAR XML SIMPLE
-// ============================================
 function generarXML(datos) {
   const fecha = new Date().toISOString().slice(0, 19);
 
@@ -51,21 +49,14 @@ function generarXML(datos) {
 </cfdi:Comprobante>`;
 }
 
-// ============================================
 // TIMBRAR
-// ============================================
 app.post('/timbrar', async (req, res) => {
   try {
     console.log('=== TIMBRADO ===');
 
-    // ⚠️ SOLO ENV VARIABLES
     const username = process.env.FINKOK_USER;
     const password = process.env.FINKOK_PASS;
     const url = process.env.FINKOK_URL || 'https://demo-facturacion.finkok.com/servicios/soap/stamp.wsdl';
-
-    console.log('Usuario:', username);
-    console.log('Password existe:', !!password);
-    console.log('Password longitud:', password ? password.length : 0);
 
     const xml = generarXML(req.body);
     const xmlBase64 = Buffer.from(xml).toString('base64');
@@ -84,8 +75,6 @@ app.post('/timbrar', async (req, res) => {
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-    console.log('SOAP trae password:', soapEnvelope.includes('<ns1:password>'));
-
     const response = await axios.post(url, soapEnvelope, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
@@ -95,34 +84,23 @@ app.post('/timbrar', async (req, res) => {
     });
 
     const responseXML = response.data.toString();
+    const uuidMatch = responseXML.match(/UUID="([^"]+)"/);
+    const uuid = uuidMatch ? uuidMatch[1] : null;
 
-console.log('Status:', response.status);
-console.log('Respuesta:', responseXML.substring(0, 500));
-
-// 🔥 EXTRAER UUID REAL
-const uuidMatch = responseXML.match(/UUID="([^"]+)"/);
-const uuid = uuidMatch ? uuidMatch[1] : null;
-
-console.log('UUID EXTRAÍDO:', uuid);
-
-// 🔥 RESPUESTA CORRECTA AL FRONT
-res.json({
-  success: true,
-  uuid: uuid,
-  raw: responseXML.substring(0, 1000)
-});
+    res.json({
+      success: true,
+      uuid,
+      raw: responseXML.substring(0, 1000)
+    });
 
   } catch (err) {
     console.error('ERROR:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ============================================
-// ============================================
 // AUTH — REGISTRO
-// ============================================
-app.post('/api/auth/register', async (req, res) => {
+app.post('/auth/register', async (req, res) => {
   try {
     const { email, password, name, rfc, razonSocial } = req.body;
 
@@ -133,17 +111,29 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
 
-    console.log('Nuevo usuario:', req.body);
+    const exists = users.find(u => u.email === email);
+    if (exists) {
+      return res.status(400).json({
+        success: false,
+        error: 'Usuario ya existe'
+      });
+    }
+
+    const user = {
+      id: Date.now(),
+      email,
+      password,
+      name,
+      rfc,
+      razonSocial,
+      plan: 'gratuito'
+    };
+
+    users.push(user);
 
     return res.json({
       success: true,
-      user: {
-        email,
-        name,
-        rfc,
-        razonSocial,
-        plan: 'gratuito'
-      }
+      user
     });
 
   } catch (err) {
@@ -154,20 +144,24 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// ============================================
 // AUTH — LOGIN
-// ============================================
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, password } = req.body;
+
+    const user = users.find(u => u.email === email && u.password === password);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Credenciales inválidas'
+      });
+    }
 
     return res.json({
       success: true,
       token: 'test-token',
-      user: {
-        email,
-        plan: 'gratuito'
-      }
+      user
     });
 
   } catch (err) {
@@ -177,11 +171,16 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 });
+
+// 404 JSON
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found'
+  });
+});
+
 // START
-// ============================================
-// ============================================
-// AUTH - REGISTRO
-// ============================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
