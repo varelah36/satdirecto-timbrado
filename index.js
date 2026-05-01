@@ -8,7 +8,6 @@ const axios = require('axios');
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 const users = [];
-
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -183,61 +182,6 @@ app.post('/api/auth/login', async (req, res) => {
 // ============================================
 // AUTH - REGISTRO
 // ============================================
-
-const users = []; // temporal (luego lo conectamos a DB)
-
-app.post('/api/auth/register', (req, res) => {
-  try {
-    const { email, password, nombre } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Datos incompletos' });
-    }
-
-    const userExists = users.find(u => u.email === email);
-    if (userExists) {
-      return res.status(400).json({ error: 'Usuario ya existe' });
-    }
-
-    const newUser = {
-      id: Date.now(),
-      email,
-      password,
-      nombre
-    };
-
-    users.push(newUser);
-
-    console.log('Usuario creado:', newUser);
-
-    res.json({
-      success: true,
-      user: newUser
-    });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================
-// LOGIN
-// ============================================
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-
-  const user = users.find(u => u.email === email && u.password === password);
-
-  if (!user) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
-  }
-
-  res.json({
-    success: true,
-    user
-  });
-});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
