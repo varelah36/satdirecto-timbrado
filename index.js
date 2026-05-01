@@ -181,7 +181,80 @@ app.use((req, res) => {
 });
 
 // START
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;// ===============================
+// STRIPE CHECKOUT
+// ===============================
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY) 
+  : null;
+
+app.post('/stripe/create-checkout-session', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: 'Stripe no configurado'
+      });
+    }
+
+    const plan = (req.body.plan || '').toLowerCase();
+    const billing = (req.body.billing || 'monthly').toLowerCase();
+
+    const priceMap = {
+      esencial: {
+        monthly: process.env.STRIPE_PRICE_ESENCIAL_MENSUAL,
+        annual: process.env.STRIPE_PRICE_ESENCIAL_ANUAL
+      },
+      profesional: {
+        monthly: process.env.STRIPE_PRICE_PROFESIONAL_MENSUAL,
+        annual: process.env.STRIPE_PRICE_PROFESIONAL_ANUAL
+      },
+      premium: {
+        monthly: process.env.STRIPE_PRICE_PREMIUM_MENSUAL,
+        annual: process.env.STRIPE_PRICE_PREMIUM_ANUAL
+      },
+      despacho: {
+        monthly: process.env.STRIPE_PRICE_DESPACHO_MENSUAL,
+        annual: process.env.STRIPE_PRICE_DESPACHO_ANUAL
+      }
+    };
+
+    const priceId = priceMap[plan]?.[billing];
+
+    if (!priceId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Plan inválido o no configurado'
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1
+        }
+      ],
+      success_url: 'https://satdirecto.com/success',
+      cancel_url: 'https://satdirecto.com/planes'
+    });
+
+    res.json({
+      success: true,
+      url: session.url
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
 });
