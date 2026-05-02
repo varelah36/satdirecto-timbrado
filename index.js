@@ -5,6 +5,7 @@
 const express = require('express');
 const axios = require('axios');
 const Stripe = require('stripe');
+const path = require('path');
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
+app.use('/app', express.static(path.join(__dirname, 'frontend', 'dist')));
 
 // CORS
 app.use((req, res, next) => {
@@ -98,7 +100,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/planes', (req, res) => {
-  return res.sendFile(require('path').join(__dirname, 'public', 'checkout.html'));
+  return res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
 });
 
 app.get('/health', (req, res) => {
@@ -376,7 +378,6 @@ app.post('/auth/register', async (req, res) => {
       rfc,
       razonSocial
     };
-
     const userCreate = await axios.post(
       `${POCKETBASE_URL}/api/collections/${USERS_COLLECTION}/records`,
       userPayload
@@ -394,26 +395,13 @@ app.post('/auth/register', async (req, res) => {
       billing,
       status: plan === 'gratuito' ? 'active' : 'pending_payment',
       stripeCustomerId: null,
-      stripeSubscriptionId: null
-    };
-
-    await upsertSubscription(headers, subscriptionData);
-
-    const { password: _pwd, passwordConfirm: _pwdConfirm, ...safeUser } = userCreate.data || {};
-
+      stripeSubscriptionId: null 
+      await upsertSubscription(headers, subscriptionData);
     return res.json({
-      success: true,
-      user: safeUser,
-      token: loginRes.data.token,
-      subscription: subscriptionData
-    });
-  } catch (err) {
-    const message = err.response?.data?.message || err.message;
-    return res.status(500).json({
-      success: false,
-      error: message
-    });
-  }
+  success: true,
+  token: loginRes.data.token,
+  user: loginRes.data.record,
+  subscription: subscriptionData
 });
 
 // AUTH — LOGIN
@@ -657,6 +645,15 @@ app.get('/success', (req, res) => {
     <p><a href="https://satdirecto.com">Ir a satdirecto.com</a></p>
   </body>
 </html>`);
+});
+
+
+app.get(['/app/*', '/app'], (req, res, next) => {
+  const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
+  if (require('fs').existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return next();
 });
 
 // 404 JSON — SIEMPRE AL FINAL
