@@ -503,10 +503,22 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
 
     console.log('[STRIPE CHECKOUT DEBUG] plan:', plan, 'billing:', billing, 'priceEnvKey:', priceEnvKey, 'priceId:', priceId);
 
+    console.log('[STRIPE CHECKOUT DEBUG] plan:', plan, 'billing:', billing, 'priceEnvKey:', priceEnvKey, 'priceId:', priceId);
+
     if (!priceId) {
       return res.status(400).json({
         success: false,
         error: `Stripe price not found: ${priceEnvKey || 'UNKNOWN_PRICE_ENV_KEY'}`
+      });
+    }
+
+    const successUrl = process.env.STRIPE_SUCCESS_URL;
+    const cancelUrl = process.env.STRIPE_CANCEL_URL;
+
+    if (!successUrl || !cancelUrl) {
+      return res.status(500).json({
+        success: false,
+        error: 'Faltan STRIPE_SUCCESS_URL o STRIPE_CANCEL_URL'
       });
     }
 
