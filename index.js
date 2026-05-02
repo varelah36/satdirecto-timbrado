@@ -521,6 +521,9 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       });
     }
 
+    console.log("STRIPE KEY PREFIX:", process.env.STRIPE_SECRET_KEY?.slice(0, 18));
+    console.log("PRICE ESENCIAL:", process.env.STRIPE_PRICE_ESENCIAL_MENSUAL);
+
     const sessionConfig = {
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -664,4 +667,6 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log('🚀 Microservicio listo en puerto', PORT);
+  console.log("STRIPE KEY PREFIX:", process.env.STRIPE_SECRET_KEY?.slice(0, 18));
+  console.log("PRICE ESENCIAL:", process.env.STRIPE_PRICE_ESENCIAL_MENSUAL);
 });
