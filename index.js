@@ -555,6 +555,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
 
     const checkoutMode = 'subscription';
     console.log('[STRIPE CHECKOUT CREATE]', { mode: checkoutMode, priceId });
+    console.log('[USING STRIPE SDK CHECKOUT]');
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -611,10 +612,10 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
 
     return res.status(500).json({
       success: false,
-      error: err?.raw || err?.message,
+      type: err?.type,
+      message: err?.message,
       statusCode: err?.statusCode,
-      code: err?.code,
-      param: err?.param
+      raw: err?.raw
     });
   }
 });
