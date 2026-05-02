@@ -337,7 +337,6 @@ app.post('/auth/register', async (req, res) => {
     const { email, password, name, rfc, razonSocial } = req.body;
     const plan = (req.body.plan || '').toLowerCase();
     const billing = normalizeBilling(req.body.billing || '');
-    const billing = (req.body.billing || '').toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -449,8 +448,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     }
 
     const plan = (req.body.plan || '').toLowerCase();
-    const billing = normalizeBilling(req.body.billing || 'monthly');
-    const billing = (req.body.billing || 'monthly').toLowerCase();
+
     const email = req.user?.record?.email || req.body.email || '';
 
     const priceMap = {
@@ -554,7 +552,6 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       sessionId: session.id,
       debugSuccessUrl: successUrl,
       debugCancelUrl: cancelUrl
-      debugSuccessUrl: successUrl
     });
   } catch (err) {
     console.error('ERROR STRIPE:', err.message);
