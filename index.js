@@ -331,7 +331,7 @@ app.post('/timbrar', requireUser, attachUserFromToken, requireActivePlan, async 
   }
 });
 
-// AUTH — REGISTRO
+// AUTH — REGISTRO (sin llamadas a Stripe)
 app.post('/auth/register', async (req, res) => {
   try {
     const { email, password, name, rfc, razonSocial } = req.body;
