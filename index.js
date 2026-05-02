@@ -336,7 +336,7 @@ app.post('/auth/register', async (req, res) => {
   try {
     const { email, password, name, rfc, razonSocial } = req.body;
     const plan = (req.body.plan || '').toLowerCase();
-    const billing = normalizeBilling(req.body.billing || '');
+    const billing = normalizeBilling(req.body.billing || "monthly");
 
     if (!email || !password) {
       return res.status(400).json({
@@ -448,7 +448,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     }
 
     const plan = (req.body.plan || '').toLowerCase();
-
+    const billing = normalizeBilling(req.body.billing || "monthly");
     const email = req.user?.record?.email || req.body.email || '';
 
     const priceMap = {
