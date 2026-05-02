@@ -256,6 +256,14 @@ async function attachUserFromToken(req, res, next) {
   }
 }
 
+
+function normalizeBilling(value) {
+  const raw = (value || '').toString().toLowerCase();
+  if (raw === 'mensual') return 'monthly';
+  if (raw === 'anual') return 'annual';
+  return raw;
+}
+
 // GENERAR XML SIMPLE
 function generarXML(datos) {
   const fecha = new Date().toISOString().slice(0, 19);
@@ -328,6 +336,7 @@ app.post('/auth/register', async (req, res) => {
   try {
     const { email, password, name, rfc, razonSocial } = req.body;
     const plan = (req.body.plan || '').toLowerCase();
+    const billing = normalizeBilling(req.body.billing || '');
     const billing = (req.body.billing || '').toLowerCase();
 
     if (!email || !password) {
@@ -440,6 +449,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     }
 
     const plan = (req.body.plan || '').toLowerCase();
+    const billing = normalizeBilling(req.body.billing || 'monthly');
     const billing = (req.body.billing || 'monthly').toLowerCase();
     const email = req.user?.record?.email || req.body.email || '';
 
@@ -462,7 +472,29 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       }
     };
 
+    const priceEnvKeyMap = {
+      esencial: {
+        monthly: 'STRIPE_PRICE_ESENCIAL_MENSUAL',
+        annual: 'STRIPE_PRICE_ESENCIAL_ANUAL'
+      },
+      profesional: {
+        monthly: 'STRIPE_PRICE_PROFESIONAL_MENSUAL',
+        annual: 'STRIPE_PRICE_PROFESIONAL_ANUAL'
+      },
+      premium: {
+        monthly: 'STRIPE_PRICE_PREMIUM_MENSUAL',
+        annual: 'STRIPE_PRICE_PREMIUM_ANUAL'
+      },
+      despacho: {
+        monthly: 'STRIPE_PRICE_DESPACHO_MENSUAL',
+        annual: 'STRIPE_PRICE_DESPACHO_ANUAL'
+      }
+    };
+
+    const priceEnvKey = priceEnvKeyMap[plan]?.[billing];
     const priceId = priceMap[plan]?.[billing];
+
+    console.log('[STRIPE CHECKOUT DEBUG] plan:', plan, 'billing:', billing, 'priceEnvKey:', priceEnvKey, 'priceId:', priceId);
 
     if (!priceId) {
       return res.status(400).json({
@@ -520,6 +552,8 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       success: true,
       url: session.url,
       sessionId: session.id,
+      debugSuccessUrl: successUrl,
+      debugCancelUrl: cancelUrl
       debugSuccessUrl: successUrl
     });
   } catch (err) {
