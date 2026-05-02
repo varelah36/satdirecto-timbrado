@@ -5,6 +5,7 @@
 const express = require('express');
 const axios = require('axios');
 const Stripe = require('stripe');
+const cors = require('cors');
 const path = require('path');
 
 const app = express();
@@ -83,14 +84,30 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 app.use('/app', express.static(path.join(__dirname, 'frontend', 'dist')));
 
-// CORS
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
+
+const allowedOrigins = [
+  'https://satdirecto.com',
+  'https://www.satdirecto.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.options('*', cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // HEALTH
 app.get('/', (req, res) => {
