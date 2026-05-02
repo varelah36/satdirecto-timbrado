@@ -81,6 +81,7 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (re
 });
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
 
 // CORS
 app.use((req, res, next) => {
@@ -94,6 +95,10 @@ app.use((req, res, next) => {
 // HEALTH
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+app.get('/planes', (req, res) => {
+  return res.sendFile(require('path').join(__dirname, 'public', 'checkout.html'));
 });
 
 app.get('/health', (req, res) => {
