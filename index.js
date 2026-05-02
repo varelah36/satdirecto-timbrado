@@ -377,6 +377,7 @@ app.post('/auth/register', async (req, res) => {
       name,
       rfc,
       razonSocial
+
     };
 
     const userCreate = await axios.post(
@@ -398,7 +399,6 @@ app.post('/auth/register', async (req, res) => {
       stripeCustomerId: null,
       stripeSubscriptionId: null
     };
-
     // Mantener dentro del handler async de registro
     await upsertSubscription(headers, subscriptionData);
 
@@ -532,8 +532,11 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     console.log("STRIPE KEY PREFIX:", process.env.STRIPE_SECRET_KEY?.slice(0, 18));
     console.log("PRICE ESENCIAL:", process.env.STRIPE_PRICE_ESENCIAL_MENSUAL);
 
+    const checkoutMode = 'subscription';
+    console.log('[STRIPE CHECKOUT CREATE]', { mode: checkoutMode, priceId });
+
     const sessionConfig = {
-      mode: 'subscription',
+      mode: checkoutMode,
       payment_method_types: ['card'],
       line_items: [
         {
