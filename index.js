@@ -576,6 +576,10 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
+
+    const sessionConfig = {
+      mode: checkoutMode,
+      payment_method_types: ['card'],
       line_items: [
         {
           price: priceId,
@@ -583,9 +587,14 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
         }
       ],
       success_url: successUrl,
-      cancel_url: cancelUrl
-    });
-    console.log("[STRIPE SESSION CREATED]", session.id, session.url);
+      cancel_url: cancelUrl,
+      client_reference_id: req.user.record.id,
+      metadata: {
+        userId: req.user.record.id,
+        plan,
+        billing
+      }
+    };
 
     try {
       console.log('[POCKETBASE CALL]', {
