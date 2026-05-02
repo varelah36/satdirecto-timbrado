@@ -83,6 +83,78 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 app.use('/app', express.static(path.join(__dirname, 'frontend', 'dist')));
 
+const POCKETBASE_URL = (process.env.POCKETBASE_URL || '').replace(/\/$/, '');
+const USERS_COLLECTION = process.env.POCKETBASE_USERS_COLLECTION || '_pb_users_auth_';
+const SUBSCRIPTIONS_COLLECTION = process.env.POCKETBASE_SUBSCRIPTIONS_COLLECTION || 'subscriptions';
+const ALLOWED_PLANS = ['gratuito', 'esencial', 'profesional', 'premium', 'despacho'];
+const ALLOWED_BILLING = ['monthly', 'annual'];
+
+// Stripe webhook requiere raw body (antes de express.json)
+app.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).send('Stripe no configurado');
+    }
+
+    const signature = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret || !signature) {
+      return res.status(400).send('Webhook secret o firma faltante');
+    }
+
+    const event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = session.metadata?.userId || session.client_reference_id;
+      const plan = session.metadata?.plan;
+      const billing = session.metadata?.billing;
+
+      if (userId) {
+        const authHeaders = await getPocketBaseAdminHeaders();
+        await upsertSubscription(authHeaders, {
+          userId,
+          plan: plan || 'desconocido',
+          billing,
+          status: 'active',
+          stripeCustomerId: session.customer || null,
+          stripeSubscriptionId: session.subscription || null
+        });
+      }
+    }
+
+    if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object;
+      const authHeaders = await getPocketBaseAdminHeaders();
+      await setSubscriptionStatusByStripeId(authHeaders, invoice.subscription, 'past_due');
+      await setSubscriptionStatusByStripeCustomerId(authHeaders, invoice.customer, 'past_due');
+    }
+
+    if (event.type === 'invoice.paid') {
+      const invoice = event.data.object;
+      const authHeaders = await getPocketBaseAdminHeaders();
+      await setSubscriptionStatusByStripeId(authHeaders, invoice.subscription, 'active');
+      await setSubscriptionStatusByStripeCustomerId(authHeaders, invoice.customer, 'active');
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object;
+      const authHeaders = await getPocketBaseAdminHeaders();
+      await setSubscriptionStatusByStripeId(authHeaders, subscription.id, 'canceled');
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('ERROR WEBHOOK STRIPE:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+});
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
+app.use('/app', express.static(path.join(__dirname, 'frontend', 'dist')));
+
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -559,6 +631,10 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
+
+    const sessionConfig = {
+      mode: checkoutMode,
+      payment_method_types: ['card'],
       line_items: [
         {
           price: priceId,
@@ -566,9 +642,14 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
         }
       ],
       success_url: successUrl,
-      cancel_url: cancelUrl
-    });
-    console.log("[STRIPE SESSION CREATED]", session.id, session.url);
+      cancel_url: cancelUrl,
+      client_reference_id: req.user.record.id,
+      metadata: {
+        userId: req.user.record.id,
+        plan,
+        billing
+      }
+    };
 
     try {
       console.log('[POCKETBASE CALL]', {
@@ -602,6 +683,16 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
         details: pbErr.response?.data
       });
     }
+
+    const headers = await getPocketBaseAdminHeaders();
+    await upsertSubscription(headers, {
+      userId: req.user.record.id,
+      plan,
+      billing,
+      status: 'pending_payment',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null
+    });
 
     return res.json({
       success: true,
