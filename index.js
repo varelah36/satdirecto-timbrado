@@ -518,6 +518,29 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       });
     }
 
+
+    let priceCheck;
+    try {
+      priceCheck = await stripe.prices.retrieve(priceId);
+      console.log('[STRIPE PRICE CHECK]', {
+        id: priceCheck.id,
+        active: priceCheck.active,
+        livemode: priceCheck.livemode,
+        currency: priceCheck.currency,
+        type: priceCheck.type,
+        recurringInterval: priceCheck.recurring?.interval
+      });
+    } catch (priceErr) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe price not found in this Stripe account',
+        debug: {
+          priceId,
+          stripeKeyPrefix: process.env.STRIPE_SECRET_KEY?.slice(0, 20)
+        }
+      });
+    }
+
     // Declaración única de URLs de retorno para Stripe Checkout
     const successUrl = process.env.STRIPE_SUCCESS_URL;
     const cancelUrl = process.env.STRIPE_CANCEL_URL;
@@ -558,6 +581,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       sessionConfig.customer_email = email;
     }
 
+    console.log('LINE ITEMS', sessionConfig.line_items);
     const session = await stripe.checkout.sessions.create(sessionConfig);
 
     const headers = await getPocketBaseAdminHeaders();
