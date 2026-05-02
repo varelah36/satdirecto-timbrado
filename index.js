@@ -448,7 +448,7 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     }
 
     const plan = (req.body.plan || '').toLowerCase();
-    const billing = normalizeBilling(req.body.billing || '');
+
     const email = req.user?.record?.email || req.body.email || '';
 
     const priceMap = {
