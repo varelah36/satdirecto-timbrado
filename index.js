@@ -378,7 +378,6 @@ app.post('/auth/register', async (req, res) => {
       rfc,
       razonSocial
     };
-
     const userCreate = await axios.post(
       `${POCKETBASE_URL}/api/collections/${USERS_COLLECTION}/records`,
       userPayload
@@ -396,26 +395,13 @@ app.post('/auth/register', async (req, res) => {
       billing,
       status: plan === 'gratuito' ? 'active' : 'pending_payment',
       stripeCustomerId: null,
-      stripeSubscriptionId: null
-    };
-
-    await upsertSubscription(headers, subscriptionData);
-
-    const { password: _pwd, passwordConfirm: _pwdConfirm, ...safeUser } = userCreate.data || {};
-
+      stripeSubscriptionId: null 
+      await upsertSubscription(headers, subscriptionData);
     return res.json({
-      success: true,
-      user: safeUser,
-      token: loginRes.data.token,
-      subscription: subscriptionData
-    });
-  } catch (err) {
-    const message = err.response?.data?.message || err.message;
-    return res.status(500).json({
-      success: false,
-      error: message
-    });
-  }
+  success: true,
+  token: loginRes.data.token,
+  user: loginRes.data.record,
+  subscription: subscriptionData
 });
 
 // AUTH — LOGIN
