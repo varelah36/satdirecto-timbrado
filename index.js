@@ -439,6 +439,11 @@ app.post('/auth/login', async (req, res) => {
 
 // STRIPE CHECKOUT
 app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, async (req, res) => {
+  let debugPlan = '';
+  let debugBilling = '';
+  let debugPriceEnvKey = '';
+  let debugPriceId = '';
+
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -449,6 +454,8 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
 
     const plan = (req.body.plan || '').toLowerCase();
     const billing = normalizeBilling(req.body.billing || "monthly");
+    debugPlan = plan;
+    debugBilling = billing;
     const email = req.user?.record?.email || req.body.email || '';
 
     const priceMap = {
@@ -491,13 +498,27 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
 
     const priceEnvKey = priceEnvKeyMap[plan]?.[billing];
     const priceId = priceMap[plan]?.[billing];
+    debugPriceEnvKey = priceEnvKey || '';
+    debugPriceId = priceId || '';
+
+    console.log('[STRIPE CHECKOUT DEBUG] plan:', plan, 'billing:', billing, 'priceEnvKey:', priceEnvKey, 'priceId:', priceId);
 
     console.log('[STRIPE CHECKOUT DEBUG] plan:', plan, 'billing:', billing, 'priceEnvKey:', priceEnvKey, 'priceId:', priceId);
 
     if (!priceId) {
       return res.status(400).json({
         success: false,
-        error: `Plan inválido o no configurado: ${plan} ${billing}`
+        error: `Stripe price not found: ${priceEnvKey || 'UNKNOWN_PRICE_ENV_KEY'}`
+      });
+    }
+
+    const successUrl = process.env.STRIPE_SUCCESS_URL;
+    const cancelUrl = process.env.STRIPE_CANCEL_URL;
+
+    if (!successUrl || !cancelUrl) {
+      return res.status(500).json({
+        success: false,
+        error: 'Faltan STRIPE_SUCCESS_URL o STRIPE_CANCEL_URL'
       });
     }
 
@@ -554,10 +575,37 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
       debugCancelUrl: cancelUrl
     });
   } catch (err) {
-    console.error('ERROR STRIPE:', err.message);
+    const stripeStatus = err?.statusCode || err?.raw?.statusCode || err?.response?.status;
+    const stripeMessage = err?.raw?.message || err?.message || 'Unknown Stripe error';
+    const stripeResponseData = err?.response?.data;
+    const stripeErrorMessage = err?.response?.data?.error?.message;
+    const stripeErrorCode = err?.response?.data?.error?.code;
+    const stripeErrorParam = err?.response?.data?.error?.param;
+    const stripeRequestLogUrl = err?.response?.data?.error?.request_log_url;
+
+    console.error('[STRIPE CHECKOUT ERROR]', {
+      plan: debugPlan,
+      billing: debugBilling,
+      priceEnvKey: debugPriceEnvKey,
+      priceId: debugPriceId,
+      stripeStatus,
+      stripeMessage,
+      stripeResponseData,
+      stripeErrorMessage,
+      stripeErrorCode,
+      stripeErrorParam,
+      stripeRequestLogUrl
+    });
+
     return res.status(500).json({
       success: false,
-      error: err.message
+      error: stripeMessage,
+      stripeStatus,
+      stripeResponseData,
+      stripeErrorMessage,
+      stripeErrorCode,
+      stripeErrorParam,
+      stripeRequestLogUrl
     });
   }
 });
