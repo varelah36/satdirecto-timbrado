@@ -377,6 +377,7 @@ app.post('/auth/register', async (req, res) => {
       name,
       rfc,
       razonSocial
+
     };
 
     const userCreate = await axios.post(
@@ -398,7 +399,6 @@ app.post('/auth/register', async (req, res) => {
       stripeCustomerId: null,
       stripeSubscriptionId: null
     };
-
     // Mantener dentro del handler async de registro
     await upsertSubscription(headers, subscriptionData);
 
