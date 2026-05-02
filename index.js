@@ -570,15 +570,38 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     });
     console.log("[STRIPE SESSION CREATED]", session.id, session.url);
 
-    const headers = await getPocketBaseAdminHeaders();
-    await upsertSubscription(headers, {
-      userId: req.user.record.id,
-      plan,
-      billing,
-      status: 'pending_payment',
-      stripeCustomerId: null,
-      stripeSubscriptionId: null
-    });
+    try {
+      console.log('[POCKETBASE CALL]', {
+        url: `${POCKETBASE_URL}/api/admins/auth-with-password`,
+        collection: 'admins',
+        operation: 'auth'
+      });
+      const headers = await getPocketBaseAdminHeaders();
+
+      console.log('[POCKETBASE CALL]', {
+        url: `${POCKETBASE_URL}/api/collections/${SUBSCRIPTIONS_COLLECTION}/records`,
+        collection: SUBSCRIPTIONS_COLLECTION,
+        operation: 'upsertSubscription'
+      });
+
+      await upsertSubscription(headers, {
+        userId: req.user.record.id,
+        plan,
+        billing,
+        status: 'pending_payment',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null
+      });
+    } catch (pbErr) {
+      return res.status(404).json({
+        success: false,
+        error: 'PocketBase resource not found',
+        pocketbaseUrl: POCKETBASE_URL,
+        collection: SUBSCRIPTIONS_COLLECTION,
+        operation: 'upsertSubscription',
+        details: pbErr.response?.data
+      });
+    }
 
     return res.json({
       success: true,
