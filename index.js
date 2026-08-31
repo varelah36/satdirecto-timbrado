@@ -144,7 +144,11 @@ async function getPocketBaseAdminHeaders() {
     throw new Error('Credenciales admin de PocketBase no configuradas');
   }
 
-  const authRes = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
+  // PocketBase 0.23+ renombró "admins" a "superusers" y movió el login a
+  // /api/collections/_superusers/auth-with-password -- el endpoint viejo
+  // (/api/admins/auth-with-password) devuelve 404 en la instancia actual.
+  // La forma de la respuesta no cambió en el campo que usamos (`token`).
+  const authRes = await axios.post(`${POCKETBASE_URL}/api/collections/_superusers/auth-with-password`, {
     identity,
     password
   });
@@ -573,10 +577,6 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
     const checkoutMode = 'subscription';
     console.log('[STRIPE CHECKOUT CREATE]', { mode: checkoutMode, priceId });
     console.log('[USING STRIPE SDK CHECKOUT]');
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      payment_method_types: ["card"],
-
     const sessionConfig = {
       mode: checkoutMode,
       payment_method_types: ['card'],
@@ -595,11 +595,12 @@ app.post('/stripe/create-checkout-session', requireUser, attachUserFromToken, as
         billing
       }
     };
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     try {
       console.log('[POCKETBASE CALL]', {
-        url: `${POCKETBASE_URL}/api/admins/auth-with-password`,
-        collection: 'admins',
+        url: `${POCKETBASE_URL}/api/collections/_superusers/auth-with-password`,
+        collection: '_superusers',
         operation: 'auth'
       });
       const headers = await getPocketBaseAdminHeaders();
